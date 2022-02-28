@@ -1,0 +1,8 @@
+[package]
+name = "gotors"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dirs = "4.0.0"
+lexopt = "0.2.0"
