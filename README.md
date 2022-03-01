@@ -1,6 +1,6 @@
 ## goto (in Rust)
 
-This is a re-implementation of my [`goto`](https://github.com/aos/goto) command in Rust.
+This is a re-implementation of my [`goto`](https://github.com/aos/goto) CLI in Rust.
 
 ### Changes from original
 

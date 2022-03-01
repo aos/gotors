@@ -2,17 +2,22 @@ use dirs;
 use lexopt;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 
 mod shell;
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+const SEPARATOR: &str = ":";
 const USAGE: &str = "Usage:
   add | a <name>    Bind current directory to name (default: base name)
   list | l          Lists the currently installed shortcuts
   init              Prints out the Bash integration code
   help | --help     Prints out this help message";
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = parse_args()?;
+fn main() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let args = parse_args(&cwd)?;
     if let Args::Help = args {
         println!("{}", USAGE);
         std::process::exit(0);
@@ -43,21 +48,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let rc_file = fs::OpenOptions::new()
+    let mut rc_file = fs::OpenOptions::new()
         .read(true)
         .create(true)
         .append(true)
         .open(&gotorc)?;
 
-    let file = fs::read_to_string(&gotorc)?;
-    let jump_map = file
+    let read_file = fs::read_to_string(&gotorc)?;
+    let jump_map = read_file
         .lines()
-        .map(|l| l.split_once(":"))
+        .map(|l| l.split_once(SEPARATOR))
         .collect::<Option<HashMap<_, _>>>()
-        .ok_or("no jump file")?;
+        .ok_or("no jump map")?;
 
-    if let Args::List = args {
-    }
+    match args {
+        Args::List => {
+            if jump_map.len() > 0 {
+                println!("Shortcuts available:");
+                let mut stdout = std::io::stdout();
+                for (k, v) in jump_map {
+                    writeln!(stdout, "{:5} -> {}", k, v)?;
+                }
+            } else {
+                println!("No shortcuts added.");
+            }
+        }
+        Args::Add(shortcut) => {
+            writeln!(rc_file, "{}{}{}", shortcut, SEPARATOR, cwd.display())?;
+            println!("Added shortcut: {} -> {}", shortcut, cwd.display());
+        }
+        Args::Dir(shortcut) => {
+            print!(
+                "{}",
+                jump_map
+                    .get(shortcut.as_str())
+                    .ok_or("shortcut not found")?
+            );
+        }
+        _ => unreachable!(),
+    };
 
     Ok(())
 }
@@ -71,7 +100,7 @@ enum Args {
     Help,
 }
 
-fn parse_args() -> Result<Args, lexopt::Error> {
+fn parse_args(cwd: &std::path::PathBuf) -> Result<Args> {
     use lexopt::prelude::*;
 
     let mut parser = lexopt::Parser::from_env();
@@ -81,10 +110,17 @@ fn parse_args() -> Result<Args, lexopt::Error> {
                 "l" | "list" => Ok(Args::List),
                 "a" | "add" => {
                     if let Some(Value(dir)) = parser.next()? {
-                        Ok(Args::Add(dir.into_string()?))
+                        let d = dir
+                            .into_string()
+                            .map_err(|e| lexopt::Error::NonUnicodeValue(e))?;
+                        Ok(Args::Add(d))
                     } else {
-                        println!(r#"Error: "add" requires a shortcut name"#);
-                        std::process::exit(1);
+                        // default to basename of directory
+                        let basename = cwd
+                            .file_name()
+                            .and_then(|f| Some(f.to_str()?.to_owned()))
+                            .ok_or("no basename")?;
+                        Ok(Args::Add(basename))
                     }
                 }
                 "rm" | "remove" => todo!(),
@@ -93,7 +129,7 @@ fn parse_args() -> Result<Args, lexopt::Error> {
                 dir => Ok(Args::Dir(dir.into())),
             },
             Long("help") => Ok(Args::Help),
-            _ => Err(arg.unexpected()),
+            _ => Err(Box::new(arg.unexpected())),
         }
     } else {
         Ok(Args::Help)
