@@ -5,5 +5,5 @@ This is a re-implementation of my [`goto`](https://github.com/aos/goto) CLI in R
 ### Changes from original
 
 - Subcommands instead of options for listing, adding, and init
-- Attempt to place the `gotorc` file in the `$XDG_CONFIG_DIR` first before
+- Attempts to place the `gotorc` file in the `$XDG_CONFIG_HOME` first before
   `$HOME`.

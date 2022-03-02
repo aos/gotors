@@ -2,7 +2,7 @@ use dirs;
 use lexopt;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 
 mod shell;
 
@@ -10,10 +10,11 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const SEPARATOR: &str = ":";
 const USAGE: &str = "Usage:
-  add | a <name>    Bind current directory to name (default: base name)
-  list | l          Lists the currently installed shortcuts
-  init              Prints out the Bash integration code
-  help | --help     Prints out this help message";
+  l | list              Lists the currently installed shortcuts
+  a | add <name>        Bind current directory to name (default: basename)
+  rm | remove <name>    Remove the specified shortcut
+  init                  Prints out shell integration code
+  help | --help         Prints out this help message";
 
 fn main() -> Result<()> {
     let cwd = std::env::current_dir()?;
@@ -48,35 +49,58 @@ fn main() -> Result<()> {
         }
     };
 
-    let mut rc_file = fs::OpenOptions::new()
-        .read(true)
-        .create(true)
-        .append(true)
-        .open(&gotorc)?;
-
-    let read_file = fs::read_to_string(&gotorc)?;
-    let jump_map = read_file
-        .lines()
-        .map(|l| l.split_once(SEPARATOR))
-        .collect::<Option<HashMap<_, _>>>()
-        .ok_or("no jump map")?;
+    let mut jump_map = {
+        let mut rc_file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&gotorc)?;
+        let mut s = String::new();
+        rc_file.read_to_string(&mut s)?;
+        s.lines()
+            .map(|l| {
+                l.split_once(SEPARATOR)
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+            })
+            .collect::<Option<HashMap<_, _>>>()
+            .ok_or("no jump_map")?
+    };
 
     match args {
         Args::List => {
             if jump_map.len() > 0 {
                 println!("Shortcuts available:");
-                let mut stdout = std::io::stdout();
                 for (k, v) in jump_map {
-                    writeln!(stdout, "{:5} -> {}", k, v)?;
+                    println!("{:5} -> {}", k, v);
                 }
             } else {
                 println!("No shortcuts added.");
             }
         }
         Args::Add(shortcut) => {
+            let mut rc_file = fs::OpenOptions::new()
+                .read(true)
+                .append(true)
+                .open(&gotorc)?;
             writeln!(rc_file, "{}{}{}", shortcut, SEPARATOR, cwd.display())?;
             println!("Added shortcut: {} -> {}", shortcut, cwd.display());
         }
+        Args::Remove(shortcut) => match jump_map.remove_entry(&*shortcut) {
+            Some((old_shortcut, old_path)) => {
+                let mut rc_file = fs::OpenOptions::new()
+                    .truncate(true)
+                    .write(true)
+                    .open(&gotorc)?;
+                for (k, v) in jump_map {
+                    writeln!(rc_file, "{}{}{}", k, SEPARATOR, v)?;
+                }
+                println!("Removed shortcut: {} -> {}", old_shortcut, old_path);
+            }
+            None => {
+                eprintln!("Error: shortcut does not exist.");
+                std::process::exit(1);
+            }
+        },
         Args::Dir(shortcut) => {
             print!(
                 "{}",
@@ -96,6 +120,7 @@ enum Args {
     Dir(String),
     List,
     Add(String),
+    Remove(String),
     Init(shell::Shell),
     Help,
 }
@@ -123,7 +148,17 @@ fn parse_args(cwd: &std::path::PathBuf) -> Result<Args> {
                         Ok(Args::Add(basename))
                     }
                 }
-                "rm" | "remove" => todo!(),
+                "rm" | "remove" => {
+                    if let Some(Value(shortcut)) = parser.next()? {
+                        let s = shortcut
+                            .into_string()
+                            .map_err(|e| lexopt::Error::NonUnicodeValue(e))?;
+                        Ok(Args::Remove(s))
+                    } else {
+                        eprintln!("Error: shortcut not specified.");
+                        std::process::exit(1);
+                    }
+                }
                 "init" => Ok(Args::Init(shell::Shell::Bash)),
                 "help" => Ok(Args::Help),
                 dir => Ok(Args::Dir(dir.into())),
