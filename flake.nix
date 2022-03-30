@@ -11,7 +11,7 @@
     utils.lib.eachDefaultSystem
       (system:
         let
-          name = "goto";
+          name = "gotors";
           pkgs = import nixpkgs {
             inherit system;
             overlays = [
