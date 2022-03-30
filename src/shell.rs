@@ -13,13 +13,13 @@ impl std::fmt::Display for Shell {
                     f,
                     "{}",
                     r##"# To make the binary work, add the following lines of code
-# to your ~/.bash_profile or ~/.bash_rc
+# to your ~/.bash_profile or ~/.bashrc
 #
-# eval "$(goto --init)"
+# eval "$(gotors init)"
 #
 # It will autogenerate this text to make the magic happen.
 g() {
-  local dir="$(goto $@)"
+  local dir="$(gotors $@)"
   test -d "$dir" && cd "$dir" || echo "$dir"
 }"##
                 )

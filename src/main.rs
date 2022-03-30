@@ -36,7 +36,7 @@ fn main() -> Result<()> {
 
     let gotorc = match dirs::config_dir() {
         Some(mut d) => {
-            d.push("goto");
+            d.push("gotors");
             // The directory might already exist, don't bother checking result
             let _ = fs::create_dir(&d);
             d.push("gotorc");
@@ -58,8 +58,8 @@ fn main() -> Result<()> {
         let mut s = String::new();
         rc_file.read_to_string(&mut s)?;
         s.lines()
-            .map(|l| {
-                l.split_once(SEPARATOR)
+            .map(|line| {
+                line.split_once(SEPARATOR)
                     .map(|(k, v)| (k.to_string(), v.to_string()))
             })
             .collect::<Option<HashMap<_, _>>>()
