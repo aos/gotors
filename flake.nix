@@ -43,6 +43,10 @@
               rustfmt
             ];
           };
+
+          overlay = final: prev: rec {
+            gotors = pkgs.${final.system}.gotors;
+          };
         }
       );
 }
