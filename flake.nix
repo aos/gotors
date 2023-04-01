@@ -8,6 +8,11 @@
   };
 
   outputs = { self, nixpkgs, utils, rust-overlay, naersk, ... }:
+    {
+      overlays.default = final: prev: {
+        gotors = self.packages.${prev.stdenv.hostPlatform.system}.gotors;
+      };
+    } //
     utils.lib.eachDefaultSystem
       (system:
         let
@@ -15,7 +20,7 @@
           pkgs = import nixpkgs {
             inherit system;
             overlays = [
-              rust-overlay.overlay
+              rust-overlay.overlays.default
               (self: super: {
                 rustc = self.rust-bin.stable.latest.default;
                 cargo = self.rust-bin.stable.latest.default;
@@ -25,16 +30,16 @@
         in
         rec {
           # nix build
-          defaultPackage = packages.${name};
           packages = {
             ${name} = naersk.lib.${system}.buildPackage {
               pname = name;
               root = ./.;
             };
+            default = packages.${name};
           };
 
           # nix develop
-          devShell = pkgs.mkShell {
+          devShells.default = pkgs.mkShell {
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
             inputsFrom = builtins.attrValues self.packages.${system};
             buildInputs = with pkgs; [
@@ -42,10 +47,6 @@
               rust-analyzer
               rustfmt
             ];
-          };
-
-          overlay = final: prev: rec {
-            gotors = pkgs.${final.system}.gotors;
           };
         }
       );
