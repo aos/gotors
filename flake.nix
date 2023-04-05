@@ -2,17 +2,12 @@
   description = "Fast jump between directories";
 
   inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
     rust-overlay.url = "github:oxalica/rust-overlay";
     utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nix-community/naersk";
   };
 
-  outputs = { self, nixpkgs, utils, rust-overlay, naersk, ... }:
-    {
-      overlays.default = final: prev: {
-        gotors = self.packages.${prev.stdenv.hostPlatform.system}.gotors;
-      };
-    } //
+  outputs = { self, nixpkgs, utils, rust-overlay, ... }:
     utils.lib.eachDefaultSystem
       (system:
         let
@@ -31,9 +26,14 @@
         rec {
           # nix build
           packages = {
-            ${name} = naersk.lib.${system}.buildPackage {
+            ${name} = pkgs.rustPlatform.buildRustPackage rec {
               pname = name;
-              root = ./.;
+              version = "1.0.0";
+              src = ./.;
+
+              cargoLock = {
+                lockFile = ./Cargo.lock;
+              };
             };
             default = packages.${name};
           };
@@ -49,5 +49,10 @@
             ];
           };
         }
-      );
+      ) //
+      {
+        overlays.default = final: prev: {
+          gotors = self.packages.${prev.stdenv.hostPlatform.system}.gotors;
+        };
+      };
 }
