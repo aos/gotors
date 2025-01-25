@@ -34,6 +34,8 @@
               cargoLock = {
                 lockFile = ./Cargo.lock;
               };
+
+              meta.mainProgram = "gotors";
             };
             default = packages.${name};
           };
